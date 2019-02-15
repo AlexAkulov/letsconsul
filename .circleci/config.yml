@@ -1,0 +1,52 @@
+version: 2
+
+jobs:
+  build:
+    docker:
+      - image: circleci/golang:1.11
+    steps:
+      - checkout
+      - run: go build
+      - run: tar -czvf letsconsul.tar.gz letsconsul
+      - persist_to_workspace:
+          root: .
+          paths:
+            - letsconsul.tar.gz
+
+  publish-master:
+    docker:
+      - image: circleci/golang:1.11
+    steps:
+      - attach_workspace:
+          at: letsconsul.tar.gz
+      - run: go get github.com/tcnksm/ghr
+      - run: ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -prerelease -recreate latest letsconsul.tar.gz
+
+  publish-release:
+    docker:
+      - image: circleci/golang:1.11
+    steps:
+      - attach_workspace:
+          at: letsconsul.tar.gz
+      - run: go get github.com/tcnksm/ghr
+      - run: ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} ${CIRCLE_TAG} letsconsul.tar.gz
+
+workflows:
+  version: 2
+  main:
+    jobs:
+      - build
+      - publish-master:
+          requires:
+            - build
+          filters:
+            branches:
+              only: master
+      - publish-release:
+          requires:
+            - build
+          filters:
+            tags:
+              only: /^v\d+\.\d+\.\d+$/
+            branches:
+              ignore: /.*/
